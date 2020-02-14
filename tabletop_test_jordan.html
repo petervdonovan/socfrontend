@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/tabletop.js/1.5.1/tabletop.min.js'></script>
+
+    <script type='text/javascript'>
+        var publicSpreadsheetUrl = 'https://docs.google.com/spreadsheets/d/1LGWstyHSDI-iGlX6soMWG6lFuUJhVOMyPYcGD9tKWuw/edit?usp=sharing';
+        function getSchool() {
+            var hostName = window.location.href;
+            console.log(hostName);
+            if(hostName.includes('browning')) {
+                return 'browning';
+            }
+            else if(hostName.includes('cabrillo')) {
+                return 'cabrillo';
+            }
+            else if(hostName.includes('cams')) {
+                return 'cams';
+            }
+            else if(hostName.includes('jordan')) {
+                return 'jordan';
+            }
+            else if(hostName.includes('lakewood')) {
+                return 'lakewood';
+            }
+            else if(hostName.includes('mcbride')) {
+                return 'mcbride';
+            }
+            else if(hostName.includes('millikan')) {
+                return 'millikan';
+            }
+            else if(hostName.includes('poly')) {
+                return 'poly';
+            }
+            else if(hostName.includes('renaissance')) {
+                return 'renaissance';
+            }
+            else if(hostName.includes('sato')) {
+                return 'sato';
+            }
+            else if(hostName.includes('wilson')) {
+                return 'wilson';
+            }
+            else {
+                return null;
+            }
+        }
+        var parseUtils = { //Utility functions used to convert the text in the spreadsheet to HTML that can be made public
+          showMoresCount: 0,
+          parseGeneralText: function(text) {
+              console.log(text);
+              text = parseUtils.insertUl(parseUtils.insertOl(text, 1));
+              console.log(text);
+              return text;
+          },
+          parseTextList: function(textList) { //Parse a list containing blocks of text
+              for(let text in textList) {
+                  textList[text] = this.insertOl(textList[text], 1);
+              }
+              textList = this.insertShowMore(textList, 397 * 1.15, 397); //397 is mean # of chars before cutoff
+              for(var i = 0; i < textList.childNodes.length; i += 1) {
+                  if (textList.childNodes[i].innerHTML) {
+                      textList.childNodes[i].innerHTML = parseUtils.insertUl(textList.childNodes[i].innerHTML);
+                  }
+              }
+              return textList;
+          },
+          //Insert unordered list where they are indicated in the spreadsheet
+          insertUl: function (text) {
+            var list = text.split("\n- "); //Each li should start with a new line and a hyphen
+            var i = 0;
+            var ret = list[0];
+            var inUl = false;
+            while (i < list.length) {
+              if (inUl) { //We are in an unordered list
+                if (list[i].indexOf("\n") !== -1) { //If current item contains a newline, then everything after the newline is actually not part of the ul.
+                  ret += "<li>" + list[i].slice(0, list[i].indexOf("\n")).replace("\n", "</li></ul>") + "</li></ul>" + list[i].slice(list[i].indexOf("\n"));
+                  inUl = false;
+                }
+                else {
+                  ret += "<li>" + list[i] + "</li>";
+                }
+              }
+              if (!inUl && i !== list.length - 1) { //We are not in an ul, but we should be
+                ret += "<ul>";
+                inUl = true;
+              }
+              if (inUl && i === list.length - 1) { //This is the last li, so it is time to exit the list
+                ret += "</ul>";
+              }
+              i += 1;
+            }
+            return ret;
+          },
+          insertOl: function (text, firstNum) {
+              var searchingFor = new RegExp("\n" + firstNum + ".");
+              var nums = /\n[0-9]+./; //A newline, a number, and then a period. This is just the beginning of any line in an ordered list.
+              if (text.search(searchingFor) === -1 && firstNum === 1) { // you can't even find the beginning of the list
+                  return text; //if you can't even find one one in the text, then it has no ordered list
+                }
+              if (text.search(searchingFor) === -1 || text.search(nums) < text.search(searchingFor)) { //if the text doesn't have the num you're searching for or there is a smaller number that comes first, then this list is over
+                //Current list is over
+                if (text.indexOf("\n") != -1) {
+                	return text.slice(0, text.indexOf("\n")) + "</li></ol>" + this.insertOl(text.slice(text.indexOf("\n")), 1); //However, even if this is the end of the ordered list we wanted, there may be another ordered list
+                }
+                return text + "</li></ol>";
+              }
+              //The list is continuing
+              if (firstNum === 1) {
+                return text.slice(0, text.search(searchingFor)) //the part of the string before you get to the start of the list
+                 	+ "<ol><li>"                               //start the list
+                  + this.insertOl(text.slice(text.search(searchingFor)).replace(searchingFor, ""), firstNum + 1); //remove the 1. or 2. or 3., etc. from the list
+              }
+              return text.slice(0, text.search(searchingFor)) //For all li's other than the first and last: close the one before it and open the next one
+              	+ "</li><li>"
+                + this.insertOl(text.slice(text.search(searchingFor)).replace(searchingFor, ""), firstNum + 1);
+            },
+            insertShowMore: function (textList, maxLength, cutoffLength) { //Add the "show more" button used to view the rest of a long piece of text
+              var text = textList.join("\n"); //Things in separate cells just get combined in one string
+              if (text.length < maxLength) { //If a "show more" button is not necessary
+                var container = document.createElement("DIV");
+                var p = document.createElement("P");
+                p.innerHTML = text;
+                container.appendChild(p);
+                return p;
+              }
+              var visibleText;
+              var moreText;
+              //Skip through ordered lists
+              var i;
+              //check if the text after the cutoff has a closing ordered list but no beginning ordered list before it
+              if (text.slice(cutoffLength).indexOf("</ol>") !== -1 && (text.slice(cutoffLength).indexOf("</ol>") < text.slice(cutoffLength).indexOf("<ol>") || text.slice(cutoffLength).indexOf("<ol>") === -1)) {
+                i = cutoffLength + text.slice(cutoffLength).indexOf("</ol>");
+              }
+              else {
+                i = cutoffLength;
+              }
+              //Search for the next good stopping point at which to break the text
+              while(i < text.length) {
+                if (text.charAt(i) === ' ' || text.charAt(i) === ',') {
+                  visibleText = text.slice(0, i);
+                  moreText = text.slice(i);
+                  break;
+                }
+                i += 1;
+              }
+              //Generate the HTML of the block of text inside a DIV
+              var container = document.createElement("DIV");
+              container.innerHTML = visibleText;
+
+              //Create span containing extra text
+              var more = document.createElement("SPAN");
+              more.classList.add("interns-more");
+              more.style.display = "inline-block";
+              more.innerHTML = moreText;
+
+              //Create ellipsis
+              var ellipsis = document.createElement("SPAN");
+              ellipsis.classList.add("interns-ellipsis");
+              ellipsis.style.display = "inline";
+              ellipsis.innerHTML = "...";
+
+              //Create show more button
+              var showMore = document.createElement("SPAN");
+              showMore.classList.add("interns-show-more");
+              showMore.innerText = "Show more";
+              showMore.setAttribute('onClick', "show(" + this.showMoresCount + ")"); //Must link the current "show more" with the correct extra piece of text
+              this.showMoresCount += 1;
+
+              //Add child elements to DIV container
+              container.appendChild(more);
+              container.appendChild(ellipsis);
+              container.appendChild(showMore);
+              return container;
+            },
+            //Create a table using arrays representing its columns
+            getTable: function (cols) {
+              var table = document.createElement("TABLE");
+              var tbody = document.createElement("TBODY");
+              table.appendChild(tbody);
+              for (var r = 0; r < cols[0].length; r += 1) {
+                var row = document.createElement("TR");
+                for (var c = 0; c < cols.length; c += 1) {
+                  var cell = document.createElement("TD");
+                  if (cols[c][r]) {
+                    cell.innerText = cols[c][r];
+                  }
+                  else {
+                    cell.innerText = "---"; //Filler so that no td is completely empty
+                  }
+                  row.appendChild(cell);
+                }
+                tbody.appendChild(row);
+              }
+              return table;
+            },
+            //Create a ul using each item in an array as a li
+            getListAsUl: function (list) {
+              var ul = document.createElement("UL");
+              for (var i = 0; i < list.length; i += 1) {
+                if (list[i].trim()) {
+                  var li = document.createElement("LI");
+                  li.innerText = list[i];
+                  ul.appendChild(li);
+                }
+              }
+              return ul;
+            },
+            
+          };
+        //Get list of all items in a column in the spreadsheet that has a particular name
+        function getFieldListByProgram(schoolData, program, field) {
+            var fieldList = [];
+            program = program.toLowerCase().trim();
+            for (var i = 0; i < schoolData.elements.length; i += 1) {
+                var row = schoolData.elements[i];
+                if (row["Program"].toLowerCase().trim() === program && row[field].trim() !== "") {
+                    fieldList.push(row[field]);
+                }
+            }
+            return fieldList;
+        }
+        //------- Class to process data and generate HTML for each individual aspect of the pathway -------------------------------
+        function Pathway(schoolData, name) {
+            //Store relevant parts of the data in member variables
+            this.name = name;
+            this.programDescription      = getFieldListByProgram(schoolData, name, "Program Description");
+            this.grade9Courses           = getFieldListByProgram(schoolData, name, "Grade 9");
+            this.grade10Courses          = getFieldListByProgram(schoolData, name, "Grade 10");
+            this.grade11Courses          = getFieldListByProgram(schoolData, name, "Grade 11");
+            this.grade12Courses          = getFieldListByProgram(schoolData, name, "Grade 12");
+            this.videoUrl                = getFieldListByProgram(schoolData, name, "Link to 1-2 Minute Video");
+            this.popularElectives        = getFieldListByProgram(schoolData, name, "Popular Elective Options");
+            this.entranceCriteriaDescription = getFieldListByProgram(schoolData, name, "Entrance Criteria: Description");
+            this.entranceCriteria        = getFieldListByProgram(schoolData, name, "Entrance Criteria");
+            this.staffQuotes             = getFieldListByProgram(schoolData, name, "Two Staff Quotes");
+            this.studentQuotes           = getFieldListByProgram(schoolData, name, "Two Student Quotes");
+            //Make the course lists the same length for all grade levels
+            this.setCourseListsEqualLength = function() {
+                var maxLength = Math.max(this.grade9Courses.length, this.grade10Courses.length, this.grade11Courses.length, this.grade12Courses.length);
+                this.grade9Courses = this.grade9Courses.concat(new Array(maxLength - this.grade9Courses.length).fill(''));
+                this.grade10Courses = this.grade10Courses.concat(new Array(maxLength - this.grade10Courses.length).fill(''));
+                this.grade11Courses = this.grade11Courses.concat(new Array(maxLength - this.grade11Courses.length).fill(''));
+                this.grade12Courses = this.grade12Courses.concat(new Array(maxLength - this.grade12Courses.length).fill(''));
+            }
+            this.setCourseListsEqualLength();
+            //Using the courselists for each grade, generate a 2x2 table where each cell represents a grade and contains a course list
+            this.getCourseListTable4Cells = function() {
+                //Create elements
+                var table = document.createElement("TABLE");
+                table.classList.add("sl-cms2-table-style__vanilla", "sl-cms2-table-style__no_header");
+                var tbody = document.createElement("TBODY");
+                table.appendChild(tbody);
+                var row0 = document.createElement("TR");
+                var row1 = document.createElement("TR");
+                tbody.appendChild(row0);
+                tbody.appendChild(row1);
+                //Create TDs, fill them with ULs, and add them to the table
+                var grade9 = document.createElement("TD");
+                grade9.appendChild(parseUtils.getListAsUl(this.grade9Courses));
+                row0.appendChild(grade9);
+                var grade10 = document.createElement("TD");
+                grade10.appendChild(parseUtils.getListAsUl(this.grade10Courses));
+                row0.appendChild(grade10);
+                var grade11 = document.createElement("TD");
+                grade11.appendChild(parseUtils.getListAsUl(this.grade11Courses));
+                row1.appendChild(grade11);
+                var grade12 = document.createElement("TD");
+                grade12.appendChild(parseUtils.getListAsUl(this.grade12Courses));
+                row1.appendChild(grade12);
+                return table;
+            };
+            //Get HTML for description
+            this.getProgramDescription = function() {
+              this.programDescription = parseUtils.parseTextList(this.programDescription);
+              return this.programDescription;
+            };
+            //Get HTML for entrance criteria
+            this.getEntranceCriteria = function() {
+                //Determine if there are any entrance criteria
+                var hasEntranceCriteria = false;
+                for (var i = 0; i < this.entranceCriteria.length; i += 1) {
+                    if (this.entranceCriteria[i] != '---') {
+                        hasEntranceCriteria = true;
+                        break;
+                    }
+                }
+                if (hasEntranceCriteria) { //There are entrance criteria
+                    console.log(this.entranceCriteria);
+                    var cols = [this.entranceCriteriaDescription, this.entranceCriteria];
+                    var table = parseUtils.getTable(cols);
+                    table.classList.add("sl-cms2-table-style__vanilla"); //This is the School Loop class needed for built-in features (responsive layout) to work.
+                    return table;
+                }
+                else { //There are no entrance criteria
+                    var p = document.createElement("P");
+                    p.innerText = "No entrance criteria.";
+                    return p;
+                }
+            };
+            //Get UL of courses for each grade.
+            this.getGrade9Courses = function () {
+                return parseUtils.getListAsUl(this.grade9Courses);
+            };
+            this.getGrade10Courses = function () {
+                return parseUtils.getListAsUl(this.grade10Courses);
+            };
+            this.getGrade11Courses = function () {
+                return parseUtils.getListAsUl(this.grade11Courses);
+            };
+            this.getGrade12Courses = function () {
+                return parseUtils.getListAsUl(this.grade12Courses);
+            };
+            //Get UL of electives
+            this.getPopularElectives = function () {
+                return parseUtils.getListAsUl(this.popularElectives);
+            };
+            //Get HTML of quotes from a list of quotes.
+            this.getQuotes = function(quoteList) {
+                var container = document.createElement("DIV"); //Container for all the quotes
+                for (var j = 0; j < quoteList.length; j += 1) { //Iterate over quotes
+                    var quote = quoteList[j].split(/"|\u201C|\u201D/); //Separate into parts at each quotation mark
+                    if(quote.length === 1) { //This only happens if there are no quotation marks
+                      var q = document.createElement("P");
+                      q.innerText = quote[0];
+                      container.appendChild(q);
+                    }
+                    for (var i = 1; i < quote.length; i += 1) {
+                        var quotePartElement = document.createElement("P");
+                        if (i % 2 === 1) { //If the part currently being processed is the quote itself
+                            var inQuotationMarks = document.createElement("I"); //Put it in italics
+                            inQuotationMarks.innerHTML = "&ldquo;"; //Left quote
+                            var qInDiv = parseUtils.insertShowMore([quote[i]], 157 * 1.15, 157); //Insert show more if necessary (if it is more than 157*1.15 characters)
+                            while (qInDiv.childNodes.length) { //if elements were added by insertShowMore
+                              inQuotationMarks.appendChild(qInDiv.childNodes[0]); //Add the first element. As elements are added to inQuotationMarks, they are removed from qInDiv
+                              if(!qInDiv.childNodes.length //if this is the end of the part that should be in quotation marks
+                                  || (qInDiv.childNodes[0].classList //The next childnode has classes,
+                                      && qInDiv.childNodes[0].classList.contains("interns-show-more"))) { //and the next childnode is a show more button. This ensures that the show more button is outside the quotes.
+                                inQuotationMarks.innerHTML += "&rdquo;";
+                                break;
+                              }
+                            }
+                            quotePartElement.appendChild(inQuotationMarks); //Add the quote itself
+                            while(qInDiv.childNodes.length) {
+                              quotePartElement.appendChild(qInDiv.childNodes[0]); //Add the show more button as needed
+                            }
+                        }
+                        else { //This is not the quote itself (meaning it is probably a hyphen and someone's name, as in "-Jane Doe, Class of 2014")
+                          quotePartElement.innerHTML = quote[i]; //Simply add it with minimal processing
+                        }
+                        container.appendChild(quotePartElement);
+                    }
+                }
+                return container;
+            }
+        }
+        function Sport(attrDict) {
+            this.sport = attrDict["Sport"];
+            this.gender = attrDict["Gender (Boys, Girls, Coed)"];
+            this.cif = attrDict["CIF -- years gone to playoffs (since 2000)"];
+            this.moore = attrDict["Moore League -- years won (since 2000)"];
+            this.other = attrDict["Other tournaments/awards"];
+            this.getSportFactList = function() {
+                var list = document.createElement('UL');
+                var cif = document.createElment('LI');
+                cif.innerHTML = "CIF -- Years gone to playoffs: " + this.cif;
+                var moore = document.createElement('LI');
+                moore.innerHTML = "Moore League -- years won: " + this.moore;
+                var other = "Other tournaments/awards: " + this.other;
+                if(this.moore) {
+                    list.appendChild(moore);
+                }
+                if(this.cif) {
+                    list.appendChild(cif);
+                }
+                if(this.other) {
+                    list.appendChild(other);
+                }
+            }
+            this.get
+        }
+        //Pull data from the spreadsheet if necessary and then call the functions to generate the page
+        function Club(attrDict) {
+            this.name = attrDict["Club Name"];
+            this.description = (attrDict["Description (1-2 sentences) for top clubs"] ? parseUtils.parseGeneralText(attrDict["Description (1-2 sentences) for top clubs"]) : "");
+            this.category = attrDict["Category (Arts, Cultural, Volunteering & Advocacy, Social, STEM, or Other)"].toLowerCase().trim();
+            //Set boolean attrs
+            this.isProminent = 'TRUE' === attrDict["Prominent club? (Choose up to 6 clubs to be placed in a Top Clubs category at the top of the clubs page)"];
+            this.hasFieldTrips = 'TRUE' === attrDict["Field Trips"];
+            this.hasScholarships = 'TRUE' === attrDict["Scholarships"];
+            this.hasVolunteerOpportunities = 'TRUE' === attrDict["Volunteer Opportunities"];
+            this.hasCompetitions = 'TRUE' === attrDict["Does the club participate in competitions?"];
+            this.print = function () {
+                console.log(this.name, this.description, this.category, "FSVC:", this.hasFieldTrips, this.hasScholarships, this.hasVolunteerOpportunities, this.hasCompetitions);
+            };
+            this.getLi = function() {
+                var li = document.createElement('LI');
+                li.innerHTML = this.name;
+                if(this.hasFieldTrips) {
+                    var f = document.createElement('SPAN');
+                    f.classList.add('interns-f', 'interns-icon');
+                    f.innerHTML = "f";
+                    li.appendChild(f);
+                }
+                if(this.hasScholarships) {
+                    var s = document.createElement('SPAN');
+                    s.classList.add('interns-s', 'interns-icon');
+                    s.innerHTML = "s";
+                    li.appendChild(s);
+                }
+                if(this.hasVolunteerOpportunities) {
+                    var v = document.createElement('SPAN');
+                    v.classList.add('interns-v', 'interns-icon');
+                    v.innerHTML = "v";
+                    li.appendChild(v);
+                }
+                if(this.hasCompetitions) {
+                    var c = document.createElement('SPAN');
+                    c.classList.add('interns-c', 'interns-icon');
+                    c.innerHTML = "c";
+                    li.appendChild(c);
+                }
+                return li;
+            }
+            this.getTopClub = function() {
+                if(!this.isProminent) {
+                    return null;
+                }
+                pHeader = document.createElement("P");
+                pHeader.style.fontWeight = "bold";
+                pHeader.innerHTML = this.name;
+                pBody = document.createElement("P");
+                pBody.innerHTML = this.description;
+                container = document.createElement("DIV");
+                container.appendChild(pHeader);
+                container.appendChild(pBody);
+                return container;
+            }
+        }
+        function spreadsheetInit() {
+            console.log('hello out there');
+            if(document.getElementById("sl-cms2-page-title__h1")) { //TODO: REMOVE when using for published pages
+                var currentData = sessionStorage.getItem("soc-data");
+                if (currentData) {
+                  processData(JSON.parse(currentData));
+                }
+                else {
+                  Tabletop.init({ key: publicSpreadsheetUrl,
+                      callback: storeData,
+                      simpleSheet: false
+                  });
+                }
+            }
+        }
+        //Store data and then generate the page
+        function storeData(data, tabletop) {
+          for(let key in data) {
+            data[key].tabletop = null; //remove circular reference
+          }
+          sessionStorage.setItem("soc-data", JSON.stringify(data));
+          processData(data);
+        }
+        //Generate the page -- find the program that matches the title of the page, if one exists, store it as a pathway instance, and call populate
+        function processData(data) {
+            console.log(data);
+            pullProgram(data);
+            console.log(getSchool())
+            var schoolName = getSchool().replace(/^./, getSchool()[0].toUpperCase()); //Capitalize the first letter
+            if(data[schoolName + " Clubs"]) {
+                pullClubs(data[schoolName + " Clubs"].elements); //TODO: Figure out how to get the school name from the clubs pages.
+            }
+            if(data[schoolName + " Athletics"]) {
+                pullSports(data[schoolName + " Athletics"].elements);
+            }
+        }
+        //Populate the page with HTML by simply getting the DOM elements from pathway instance
+        function populate(pathway) {
+          var current;
+            try {
+              current = document.getElementById("pathway-description");
+              //Remove ALL the contents of the container before replacing them with something else
+              while(current.firstChild) {
+                current.removeChild(current.firstChild);
+              }
+              current.appendChild(pathway.getProgramDescription());
+            } catch(error) { console.log(error) }
+            try {
+              current = document.getElementById("entrance-criteria");
+              while(current.firstChild) {
+                current.removeChild(current.firstChild);
+              }
+              current.appendChild(pathway.getEntranceCriteria());
+            } catch(error) { console.log(error) }
+            try {
+              current = document.getElementById("grade-9");
+              while(current.firstChild) {
+                current.removeChild(current.firstChild);
+              }
+              current.appendChild(pathway.getGrade9Courses());
+            } catch(error) { console.log(error) }
+            try {
+              current = document.getElementById("grade-10");
+              while(current.firstChild) {
+                current.removeChild(current.firstChild);
+              }
+              current.appendChild(pathway.getGrade10Courses());
+            } catch(error) { console.log(error) }
+            try{
+              current = document.getElementById("grade-11");
+              while(current.firstChild) {
+                current.removeChild(current.firstChild);
+              }
+              current.appendChild(pathway.getGrade11Courses());
+            } catch(error) { console.log(error) }
+            try {
+              current = document.getElementById("grade-12");
+              while(current.firstChild) {
+                current.removeChild(current.firstChild);
+              }
+              current.appendChild(pathway.getGrade12Courses());
+            } catch(error) { console.log(error) }
+            try {
+              current = document.getElementById("popular-electives");
+              while(current.firstChild) {
+                current.removeChild(current.firstChild);
+              }
+              current.appendChild(pathway.getPopularElectives());
+            } catch(error) { console.log(error) }
+            try {
+              current = document.getElementById("student-quotes");
+              while(current.firstChild) {
+                current.removeChild(current.firstChild);
+              }
+              current.appendChild(pathway.getQuotes(pathway.studentQuotes));
+            } catch(error) { console.log(error) }
+            try {
+              current = document.getElementById("staff-quotes");
+              while(current.firstChild) {
+                current.removeChild(current.firstChild);
+              }
+              current.appendChild(pathway.getQuotes(pathway.staffQuotes));
+            } catch(error) { console.log(error) }
+        }
+        function clearChildren(node) {
+            while(node.firstChild) {
+                node.removeChild(node.firstChild);
+            }
+        }
+        function pullClubs(clubsList) {
+            console.log(clubsList);
+            var topClubs = document.getElementById("top-clubs");
+            //Stop if this is not a clubs page
+            if(!topClubs) {
+                return;
+            }
+            var artsClubs = document.getElementById("arts-clubs");
+            var culturalClubs = document.getElementById("cultural-clubs");
+            var socialClubs = document.getElementById("social-clubs");
+            var stemClubs = document.getElementById("stem-clubs");
+            var volunteeringAndAdvocacyClubs = document.getElementById("volunteering-and-advocacy-clubs");
+            var otherClubs = document.getElementById("other-clubs");
+            clearChildren(topClubs);
+            clearChildren(artsClubs);
+            clearChildren(culturalClubs);
+            clearChildren(socialClubs);
+            clearChildren(stemClubs);
+            clearChildren(volunteeringAndAdvocacyClubs);
+            clearChildren(otherClubs);
+            for (var i = 0; i < clubsList.length; i += 1) {
+                c = new Club(clubsList[i]);
+                li = c.getLi();
+                if(c.category === 'arts') {
+                    artsClubs.appendChild(li);
+                }
+                else if(c.category === 'cultural') {
+                    culturalClubs.appendChild(li);
+                }
+                else if(c.category === 'volunteering and advocacy') {
+                    volunteeringAndAdvocacyClubs.appendChild(li);
+                }
+                else if(c.category === 'social') {
+                socialClubs.appendChild(li);    
+                }
+                else if(c.category === 'stem') {
+                    stemClubs.appendChild(li);
+                }
+                else {
+                    otherClubs.appendChild(li);
+                }
+                if(c.getTopClub()) {
+                    console.log(c);
+                    topClubs.appendChild(c.getTopClub());
+                }
+            }
+        }
+        function pullSports(sportsList) {
+            console.log(sportsList);
+        }
+        function pullProgram(data) {
+            var school = "";
+            var program = document.getElementById("sl-cms2-page-title__h1").innerText.toLowerCase(); //This is the name of the program that the current page is for
+            var foundProgram = false;
+            for (let key in data) { //For each school
+              for (let row = 0; row < data[key].elements.length; row += 1) { //For each row of each school
+                if(data[key].elements[row]["Program"]) {
+                    var currentProgram = data[key].elements[row]["Program"].toLowerCase().trim();
+                    if (currentProgram && program.includes(currentProgram)) { //Determine if the row corresponds to the program that this page is for.
+                      program = currentProgram;
+                      school = key;
+                      foundProgram = true;
+                      break;
+                    }
+                    if (school) {
+                      break;
+                    }
+                }
+              }
+            }
+            if(foundProgram) {
+              var pathway = new Pathway(data[school], program);
+              populate(pathway);
+            }
+            return school;
+        }
+        window.addEventListener('DOMContentLoaded', spreadsheetInit); //This is not what should be in the actual websites
+    </script>
+
+</head>
+    <body>
+<h1 id="sl-cms2-page-title__h1">Athletics</h1>
+<span class="interns-collapsible translate">Badminton</span>
+
+<div class="interns-content">
+<p>Coed Badminton</p>
+
+<ul>
+	<li>Season: Year Round</li>
+	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+	<li>Moore League -- Years won:&nbsp;</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+</div>
+<span class="interns-collapsible translate">Baseball</span>
+
+<div class="interns-content">
+<p>Boys Baseball</p>
+
+<ul>
+	<li>Season: Spring Sport</li>
+	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+</div>
+<span class="interns-collapsible translate">Basketball</span>
+
+<div class="interns-content">
+<p>Girls Basketball</p>
+
+<ul>
+	<li>Season: Winter Sport</li>
+	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+
+<p>Boys Basketball</p>
+
+<ul>
+	<li>Season: Winter Sport</li>
+	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+	<li>Moore League -- Years won:&nbsp;2005, 2006, 2009</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+</div>
+<span class="interns-collapsible translate">Cross Country</span>
+
+<div class="interns-content">
+<p>Girls Cross Country</p>
+
+<ul>
+	<li>Season: Fall Sport</li>
+	<li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+
+<p>Boys Cross Country</p>
+
+<ul>
+	<li>Season: Fall Sport</li>
+	<li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+</div>
+<span class="interns-collapsible translate">Football</span>
+
+<div class="interns-content">
+<p>Football</p>
+
+<ul>
+	<li>Season: Fall Sport</li>
+	<li>Practice Times: (Aug-Nov) Off-Season Training (March-May, June-Aug)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+</div>
+<span class="interns-collapsible">Golf</span>
+
+<div class="interns-content">
+<p>Girls Golf</p>
+
+<ul>
+	<li>Season: Fall Sport</li>
+	<li>Practice Times: (Aug-Nov) Off-Season Training (Feb-May, July-Aug)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+
+<p>Boys Golf</p>
+
+<ul>
+	<li>Season: Spring</li>
+	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+</div>
+<span class="interns-collapsible">Soccer</span>
+
+<div class="interns-content">
+<p>Girls Soccer</p>
+
+<ul>
+	<li>Season: Winter</li>
+	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+
+<p>Boys Soccer</p>
+
+<ul>
+	<li>Season: Winter</li>
+	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+	<li>Moore League -- Years won:&nbsp;</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;2006 CIF Runner Ups</li>
+</ul>
+</div>
+<span class="interns-collapsible">Softball</span>
+
+<div class="interns-content">
+<p>Girls Softball</p>
+
+<ul>
+	<li>Season: Spring</li>
+	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+</div>
+<span class="interns-collapsible">Swim</span>
+
+<div class="interns-content">
+<p>Girls Swim</p>
+
+<ul>
+	<li>Season: Spring</li>
+	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+
+<p>Boys Swim</p>
+
+<ul>
+	<li>Season: Spring</li>
+	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+</div>
+<span class="interns-collapsible">Tennis</span>
+
+<div class="interns-content">
+<p>Girls Tennis</p>
+
+<ul>
+	<li>Season: Fall</li>
+	<li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+
+<p>Boys Tennis</p>
+
+<ul>
+	<li>Season: Spring</li>
+	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+</div>
+<span class="interns-collapsible">Track and Field</span>
+
+<div class="interns-content">
+<p>Girls Track and Field</p>
+
+<ul>
+	<li>Season: Spring</li>
+	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+
+<p>Boys Track and Field</p>
+
+<ul>
+	<li>Season: Spring</li>
+	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+</div>
+<span class="interns-collapsible">Volleyball</span>
+
+<div class="interns-content">
+<p>Girls Volleyball</p>
+
+<ul>
+	<li>Season: Fall</li>
+	<li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+
+<p>Boys Volleyball</p>
+
+<ul>
+	<li>Season: Spring</li>
+	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+	<li>Moore League -- Years won:&nbsp;2001</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;2001</li>
+	<li>Other tournaments/awards:&nbsp;2001 CIF Champions</li>
+</ul>
+</div>
+<span class="interns-collapsible">Water Polo</span>
+
+<div class="interns-content">
+<p>Girls Water Polo</p>
+
+<ul>
+	<li>Season: Winter</li>
+	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+
+<p>Boys Water Polo</p>
+
+<ul>
+	<li>Season: Fall</li>
+	<li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+</div>
+<span class="interns-collapsible">Wrestling</span>
+
+<div class="interns-content">
+<p>Girls Wrestling</p>
+
+<ul>
+	<li>Season: Winter</li>
+	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+
+<p>Boys Wrestling</p>
+
+<ul>
+	<li>Season: Winter</li>
+	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+	<li>Moore League -- Years won:</li>
+	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
+	<li>Other tournaments/awards:&nbsp;</li>
+</ul>
+</div>
+</div>
+</body>
+</html>

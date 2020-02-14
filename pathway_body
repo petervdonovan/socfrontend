@@ -1,0 +1,75 @@
+<!--Pathway page body-->
+    <body>
+<!-- ******* Left side of SOC page ************* -->
+<h1 id="sl-cms2-page-title__h1" class="sl-cms2-page-title__h1">agl-test</h1>
+<div class="interns-custom">
+<div class="jsAnchorMenuTarget sl-cms2-section-title" id="pathway-description">
+<h2 class="jsPlaceholder jsAnchorTitleHolder sl-cms2-section-title__h2  sl-cms2-title-alignment--left">Pathway Description</h2>
+
+DESCRIPTION DESCRIPTION DESCRIPTION DESCRIPTION DESCRIPTION DESCRIPTION DESCRIPTION DESCRIPTION DESCRIPTION 
+</div>
+
+</div>
+
+<div class="jsAnchorMenuTarget sl-cms2-section-title">
+<h2 class="jsPlaceholder jsAnchorTitleHolder sl-cms2-section-title__h2  sl-cms2-title-alignment--left">ENTRANCE CRITERIA</h2>
+</div>
+
+<div class="interns-custom" id="entrance-criteria">
+<p><span class="interns-more">Students interested in the University Scholars experience may apply with a minimum GPA of 3.0.</span></p>
+</div>
+<!-- ***********Middle of SOC Page*************** -->
+<table class="sl-cms2-table-style__vanilla sl-cms2-table-style__no_header">
+	<tbody>
+		<tr>
+			<td id="grade-9" style="border: 1px solid #124F11; vertical-align: top;" width="50%">
+			<p style="border-bottom: 4px solid #124F11; padding: 1px;"><strong>Grade 9</strong></p>
+			</td>
+			
+			<td id="grade-10" style="border: 1px solid #124F11; vertical-align: top;">
+			<p style="border-bottom: 4px solid #124F11; padding: 1px;"><strong>Grade 10</strong></p>
+			</td>
+		</tr>
+		<tr>
+			<td id="grade-11" style="border: 1px solid #124F11; vertical-align: top;">
+			<p style="border-bottom: 4px solid #124F11; padding: 1px;"><strong>Grade 11</strong></p>
+			</td>
+			
+			<td id="grade-12" style="border: 1px solid #124F11; vertical-align: top;">
+			<p style="border-bottom: 4px solid #124F11; padding: 1px;"><strong>Grade 12</strong></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<div id="popular-electives">
+
+</div>
+
+
+<!-- *****************Right side of the SOC page**************-->
+<div class="interns-custom">
+<div id="student-quotes">
+<div class="jsAnchorMenuTarget sl-cms2-section-title">
+<h2 class="jsPlaceholder jsAnchorTitleHolder sl-cms2-section-title__h2  sl-cms2-title-alignment--left">Student Quotes</h2>
+</div>
+
+</div>
+
+<div id="staff-quotes">
+<div class="jsAnchorMenuTarget sl-cms2-section-title">
+<h2 class="jsPlaceholder jsAnchorTitleHolder sl-cms2-section-title__h2  sl-cms2-title-alignment--left">Staff Quotes</h2>
+</div>
+
+</div>
+
+<div class="jsAnchorMenuTarget sl-cms2-section-title">
+<h2 class="jsPlaceholder jsAnchorTitleHolder sl-cms2-section-title__h2  sl-cms2-title-alignment--left">College Attendance</h2>
+</div>
+
+<p>Top colleges that AGL students attended after graduation:</p>
+
+</div>
+
+
+</body>
