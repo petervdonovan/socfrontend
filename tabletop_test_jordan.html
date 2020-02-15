@@ -8,7 +8,6 @@
         var publicSpreadsheetUrl = 'https://docs.google.com/spreadsheets/d/1LGWstyHSDI-iGlX6soMWG6lFuUJhVOMyPYcGD9tKWuw/edit?usp=sharing';
         function getSchool() {
             var hostName = window.location.href;
-            console.log(hostName);
             if(hostName.includes('browning')) {
                 return 'browning';
             }
@@ -49,9 +48,7 @@
         var parseUtils = { //Utility functions used to convert the text in the spreadsheet to HTML that can be made public
           showMoresCount: 0,
           parseGeneralText: function(text) {
-              console.log(text);
               text = parseUtils.insertUl(parseUtils.insertOl(text, 1));
-              console.log(text);
               return text;
           },
           parseTextList: function(textList) { //Parse a list containing blocks of text
@@ -287,7 +284,6 @@
                     }
                 }
                 if (hasEntranceCriteria) { //There are entrance criteria
-                    console.log(this.entranceCriteria);
                     var cols = [this.entranceCriteriaDescription, this.entranceCriteria];
                     var table = parseUtils.getTable(cols);
                     table.classList.add("sl-cms2-table-style__vanilla"); //This is the School Loop class needed for built-in features (responsive layout) to work.
@@ -358,16 +354,28 @@
         function Sport(attrDict) {
             this.sport = attrDict["Sport"];
             this.gender = attrDict["Gender (Boys, Girls, Coed)"];
+            this.season = attrDict["Season"];
+            this.offSeason = attrDict["Off-season training"];
             this.cif = attrDict["CIF -- years gone to playoffs (since 2000)"];
             this.moore = attrDict["Moore League -- years won (since 2000)"];
             this.other = attrDict["Other tournaments/awards"];
             this.getSportFactList = function() {
                 var list = document.createElement('UL');
-                var cif = document.createElment('LI');
+                var season = document.createElement('LI');
+                season.innerHTML = "Season: " + (this.season ? this.season : "");
+                var offSeason = document.createElement('LI');
+                offSeason.innerHTML = "Off-season training: " + this.offSeason;
+                var cif = document.createElement('LI');
                 cif.innerHTML = "CIF -- Years gone to playoffs: " + this.cif;
                 var moore = document.createElement('LI');
                 moore.innerHTML = "Moore League -- years won: " + this.moore;
-                var other = "Other tournaments/awards: " + this.other;
+                var other = document.createElement('LI');
+                other.innerHTML = "Other tournaments/awards: " + this.other;
+                
+                list.appendChild(season);
+                if(this.offSeason) {
+                    list.appendChild(offSeason);
+                }
                 if(this.moore) {
                     list.appendChild(moore);
                 }
@@ -377,8 +385,13 @@
                 if(this.other) {
                     list.appendChild(other);
                 }
+                return list;
             }
-            this.get
+            this.getGender = function() {
+                var p = document.createElement('P');
+                p.innerHTML = this.gender;
+                return p;
+            }
         }
         //Pull data from the spreadsheet if necessary and then call the functions to generate the page
         function Club(attrDict) {
@@ -439,7 +452,6 @@
             }
         }
         function spreadsheetInit() {
-            console.log('hello out there');
             if(document.getElementById("sl-cms2-page-title__h1")) { //TODO: REMOVE when using for published pages
                 var currentData = sessionStorage.getItem("soc-data");
                 if (currentData) {
@@ -463,15 +475,13 @@
         }
         //Generate the page -- find the program that matches the title of the page, if one exists, store it as a pathway instance, and call populate
         function processData(data) {
-            console.log(data);
             pullProgram(data);
-            console.log(getSchool())
             var schoolName = getSchool().replace(/^./, getSchool()[0].toUpperCase()); //Capitalize the first letter
             if(data[schoolName + " Clubs"]) {
                 pullClubs(data[schoolName + " Clubs"].elements); //TODO: Figure out how to get the school name from the clubs pages.
             }
             if(data[schoolName + " Athletics"]) {
-                pullSports(data[schoolName + " Athletics"].elements);
+                pullAthletics(data[schoolName + " Athletics"].elements);
             }
         }
         //Populate the page with HTML by simply getting the DOM elements from pathway instance
@@ -548,7 +558,6 @@
             }
         }
         function pullClubs(clubsList) {
-            console.log(clubsList);
             var topClubs = document.getElementById("top-clubs");
             //Stop if this is not a clubs page
             if(!topClubs) {
@@ -589,13 +598,52 @@
                     otherClubs.appendChild(li);
                 }
                 if(c.getTopClub()) {
-                    console.log(c);
                     topClubs.appendChild(c.getTopClub());
                 }
             }
         }
-        function pullSports(sportsList) {
-            console.log(sportsList);
+        function pullAthletics(athleticsList) {
+            var container = document.getElementById("athletics-list");
+            if(!container) {
+                return;
+            }
+            clearChildren(container);
+            for (var i = 0; i < athleticsList.length; i += 1) {
+                var sport = new Sport(athleticsList[i]);
+                var j = 0;
+                //Search for preexisting dropdown for this type of sport
+                while(j < container.children.length) {
+                    if(container.children[j].classList.contains("interns-collapsible") && 
+                       container.children[j].innerHTML.search(sport.sport) !== -1) {
+                        break;
+                    }
+                    else {
+                        j += 1;
+                    }
+                }
+                //If j got to the end of the children list without finding the same sport name
+                if(j === container.children.length) {
+                    var dropdownLabel = document.createElement("SPAN");
+                    dropdownLabel.classList.add("interns-collapsible", "translate");
+                    dropdownLabel.innerHTML = sport.sport;
+                    container.appendChild(dropdownLabel);
+                }
+                //Now j is the index of the span that is the label of the dropdown.
+                var content = document.createElement("DIV");
+                content.classList.add("interns-content");
+                var genderP = sport.getGender();
+                var factList = sport.getSportFactList();
+                content.appendChild(genderP);
+                content.appendChild(factList);
+                if(j === container.children.length - 1) {
+                    container.appendChild(content);
+                }
+                else {
+                    container.children[j + 1].appendChild(genderP);
+                    container.children[j + 1].appendChild(factList);
+                }
+            }
+            dropdownInit();
         }
         function pullProgram(data) {
             var school = "";
@@ -623,294 +671,303 @@
             }
             return school;
         }
+        
+        
+        
+        
+        
+        //******************* DO NOT COPY PASTE ANYTHING PAST THIS POINT INTO THE WEBSITES. *************************************************/
         window.addEventListener('DOMContentLoaded', spreadsheetInit); //This is not what should be in the actual websites
+        function dropdownInit() {}
     </script>
 
 </head>
     <body>
 <h1 id="sl-cms2-page-title__h1">Athletics</h1>
-<span class="interns-collapsible translate">Badminton</span>
+<div id="athletics-list">
+    <span class="interns-collapsible translate">Badminton</span>
 
-<div class="interns-content">
-<p>Coed Badminton</p>
+    <div class="interns-content">
+        <p>Coed Badminton</p>
 
-<ul>
-	<li>Season: Year Round</li>
-	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
-	<li>Moore League -- Years won:&nbsp;</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
+        <ul>
+            <li>Season: Year Round</li>
+            <li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+            <li>Moore League -- Years won:&nbsp;</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+        </div>
+        <span class="interns-collapsible translate">Baseball</span>
+
+        <div class="interns-content">
+        <p>Boys Baseball</p>
+
+        <ul>
+            <li>Season: Spring Sport</li>
+            <li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+    </div>
+    <span class="interns-collapsible translate">Basketball</span>
+
+    <div class="interns-content">
+        <p>Girls Basketball</p>
+
+        <ul>
+            <li>Season: Winter Sport</li>
+            <li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+
+        <p>Boys Basketball</p>
+
+        <ul>
+            <li>Season: Winter Sport</li>
+            <li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+            <li>Moore League -- Years won:&nbsp;2005, 2006, 2009</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+    </div>
+    <span class="interns-collapsible translate">Cross Country</span>
+
+    <div class="interns-content">
+        <p>Girls Cross Country</p>
+
+        <ul>
+            <li>Season: Fall Sport</li>
+            <li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+
+        <p>Boys Cross Country</p>
+
+        <ul>
+            <li>Season: Fall Sport</li>
+            <li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+    </div>
+    <span class="interns-collapsible translate">Football</span>
+
+    <div class="interns-content">
+        <p>Football</p>
+
+        <ul>
+            <li>Season: Fall Sport</li>
+            <li>Practice Times: (Aug-Nov) Off-Season Training (March-May, June-Aug)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+    </div>
+    <span class="interns-collapsible">Golf</span>
+
+    <div class="interns-content">
+        <p>Girls Golf</p>
+
+        <ul>
+            <li>Season: Fall Sport</li>
+            <li>Practice Times: (Aug-Nov) Off-Season Training (Feb-May, July-Aug)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+
+        <p>Boys Golf</p>
+
+        <ul>
+            <li>Season: Spring</li>
+            <li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+    </div>
+    <span class="interns-collapsible">Soccer</span>
+
+    <div class="interns-content">
+        <p>Girls Soccer</p>
+
+        <ul>
+            <li>Season: Winter</li>
+            <li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+
+        <p>Boys Soccer</p>
+
+        <ul>
+            <li>Season: Winter</li>
+            <li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+            <li>Moore League -- Years won:&nbsp;</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;2006 CIF Runner Ups</li>
+        </ul>
+    </div>
+    <span class="interns-collapsible">Softball</span>
+
+    <div class="interns-content">
+        <p>Girls Softball</p>
+
+        <ul>
+            <li>Season: Spring</li>
+            <li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+    </div>
+    <span class="interns-collapsible">Swim</span>
+
+    <div class="interns-content">
+        <p>Girls Swim</p>
+
+        <ul>
+            <li>Season: Spring</li>
+            <li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+
+        <p>Boys Swim</p>
+
+        <ul>
+            <li>Season: Spring</li>
+            <li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+    </div>
+    <span class="interns-collapsible">Tennis</span>
+
+    <div class="interns-content">
+        <p>Girls Tennis</p>
+
+        <ul>
+            <li>Season: Fall</li>
+            <li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+
+        <p>Boys Tennis</p>
+
+        <ul>
+            <li>Season: Spring</li>
+            <li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+    </div>
+    <span class="interns-collapsible">Track and Field</span>
+
+    <div class="interns-content">
+        <p>Girls Track and Field</p>
+
+        <ul>
+            <li>Season: Spring</li>
+            <li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+
+        <p>Boys Track and Field</p>
+
+        <ul>
+            <li>Season: Spring</li>
+            <li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+    </div>
+    <span class="interns-collapsible">Volleyball</span>
+
+    <div class="interns-content">
+        <p>Girls Volleyball</p>
+
+        <ul>
+            <li>Season: Fall</li>
+            <li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+
+        <p>Boys Volleyball</p>
+
+        <ul>
+            <li>Season: Spring</li>
+            <li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
+            <li>Moore League -- Years won:&nbsp;2001</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;2001</li>
+            <li>Other tournaments/awards:&nbsp;2001 CIF Champions</li>
+        </ul>
+    </div>
+    <span class="interns-collapsible">Water Polo</span>
+
+    <div class="interns-content">
+        <p>Girls Water Polo</p>
+
+        <ul>
+            <li>Season: Winter</li>
+            <li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+
+        <p>Boys Water Polo</p>
+
+        <ul>
+            <li>Season: Fall</li>
+            <li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+    </div>
+    <span class="interns-collapsible">Wrestling</span>
+
+    <div class="interns-content">
+        <p>Girls Wrestling</p>
+
+        <ul>
+            <li>Season: Winter</li>
+            <li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+
+        <p>Boys Wrestling</p>
+
+        <ul>
+            <li>Season: Winter</li>
+            <li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
+            <li>Moore League -- Years won:</li>
+            <li>CIF -- Years Gone to playoffs:&nbsp;</li>
+            <li>Other tournaments/awards:&nbsp;</li>
+        </ul>
+    </div>
 </div>
-<span class="interns-collapsible translate">Baseball</span>
-
-<div class="interns-content">
-<p>Boys Baseball</p>
-
-<ul>
-	<li>Season: Spring Sport</li>
-	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-</div>
-<span class="interns-collapsible translate">Basketball</span>
-
-<div class="interns-content">
-<p>Girls Basketball</p>
-
-<ul>
-	<li>Season: Winter Sport</li>
-	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-
-<p>Boys Basketball</p>
-
-<ul>
-	<li>Season: Winter Sport</li>
-	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
-	<li>Moore League -- Years won:&nbsp;2005, 2006, 2009</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-</div>
-<span class="interns-collapsible translate">Cross Country</span>
-
-<div class="interns-content">
-<p>Girls Cross Country</p>
-
-<ul>
-	<li>Season: Fall Sport</li>
-	<li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-
-<p>Boys Cross Country</p>
-
-<ul>
-	<li>Season: Fall Sport</li>
-	<li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-</div>
-<span class="interns-collapsible translate">Football</span>
-
-<div class="interns-content">
-<p>Football</p>
-
-<ul>
-	<li>Season: Fall Sport</li>
-	<li>Practice Times: (Aug-Nov) Off-Season Training (March-May, June-Aug)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-</div>
-<span class="interns-collapsible">Golf</span>
-
-<div class="interns-content">
-<p>Girls Golf</p>
-
-<ul>
-	<li>Season: Fall Sport</li>
-	<li>Practice Times: (Aug-Nov) Off-Season Training (Feb-May, July-Aug)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-
-<p>Boys Golf</p>
-
-<ul>
-	<li>Season: Spring</li>
-	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-</div>
-<span class="interns-collapsible">Soccer</span>
-
-<div class="interns-content">
-<p>Girls Soccer</p>
-
-<ul>
-	<li>Season: Winter</li>
-	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-
-<p>Boys Soccer</p>
-
-<ul>
-	<li>Season: Winter</li>
-	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
-	<li>Moore League -- Years won:&nbsp;</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;2006 CIF Runner Ups</li>
-</ul>
-</div>
-<span class="interns-collapsible">Softball</span>
-
-<div class="interns-content">
-<p>Girls Softball</p>
-
-<ul>
-	<li>Season: Spring</li>
-	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-</div>
-<span class="interns-collapsible">Swim</span>
-
-<div class="interns-content">
-<p>Girls Swim</p>
-
-<ul>
-	<li>Season: Spring</li>
-	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-
-<p>Boys Swim</p>
-
-<ul>
-	<li>Season: Spring</li>
-	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-</div>
-<span class="interns-collapsible">Tennis</span>
-
-<div class="interns-content">
-<p>Girls Tennis</p>
-
-<ul>
-	<li>Season: Fall</li>
-	<li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-
-<p>Boys Tennis</p>
-
-<ul>
-	<li>Season: Spring</li>
-	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-</div>
-<span class="interns-collapsible">Track and Field</span>
-
-<div class="interns-content">
-<p>Girls Track and Field</p>
-
-<ul>
-	<li>Season: Spring</li>
-	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-
-<p>Boys Track and Field</p>
-
-<ul>
-	<li>Season: Spring</li>
-	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-</div>
-<span class="interns-collapsible">Volleyball</span>
-
-<div class="interns-content">
-<p>Girls Volleyball</p>
-
-<ul>
-	<li>Season: Fall</li>
-	<li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-
-<p>Boys Volleyball</p>
-
-<ul>
-	<li>Season: Spring</li>
-	<li>Practice Times: (Feb-May) Off-Season Training (Aug-Feb)</li>
-	<li>Moore League -- Years won:&nbsp;2001</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;2001</li>
-	<li>Other tournaments/awards:&nbsp;2001 CIF Champions</li>
-</ul>
-</div>
-<span class="interns-collapsible">Water Polo</span>
-
-<div class="interns-content">
-<p>Girls Water Polo</p>
-
-<ul>
-	<li>Season: Winter</li>
-	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-
-<p>Boys Water Polo</p>
-
-<ul>
-	<li>Season: Fall</li>
-	<li>Practice Times: (Aug-Nov) Off-Season Training (June-Aug)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-</div>
-<span class="interns-collapsible">Wrestling</span>
-
-<div class="interns-content">
-<p>Girls Wrestling</p>
-
-<ul>
-	<li>Season: Winter</li>
-	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-
-<p>Boys Wrestling</p>
-
-<ul>
-	<li>Season: Winter</li>
-	<li>Practice Times: (Nov-Feb) Off-Season Training (Sept-Nov, Feb-July)</li>
-	<li>Moore League -- Years won:</li>
-	<li>CIF -- Years Gone to playoffs:&nbsp;</li>
-	<li>Other tournaments/awards:&nbsp;</li>
-</ul>
-</div>
-</div>
+        
 </body>
 </html>
